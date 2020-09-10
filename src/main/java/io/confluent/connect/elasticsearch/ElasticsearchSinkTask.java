@@ -58,6 +58,11 @@ public class ElasticsearchSinkTask extends SinkTask {
       log.info("Starting ElasticsearchSinkTask");
 
       ElasticsearchSinkConnectorConfig config = new ElasticsearchSinkConnectorConfig(props);
+      if (client != null) {
+        this.client = client;
+      } else {
+        this.client = new JestElasticsearchClient(props);
+      }
       String type = config.getString(ElasticsearchSinkConnectorConfig.TYPE_NAME_CONFIG);
       boolean ignoreKey =
           config.getBoolean(ElasticsearchSinkConnectorConfig.KEY_IGNORE_CONFIG);
@@ -93,6 +98,8 @@ public class ElasticsearchSinkTask extends SinkTask {
           config.getBoolean(ElasticsearchSinkConnectorConfig.DROP_INVALID_MESSAGE_CONFIG);
       final boolean createIndicesAtStartTime =
           config.getBoolean(ElasticsearchSinkConnectorConfig.AUTO_CREATE_INDICES_AT_START_CONFIG);
+      String pipeline = config.getString(ElasticsearchSinkConnectorConfig.PIPELINE_CONFIG);
+      validatePipeline(pipeline);
 
       DataConverter.BehaviorOnNullValues behaviorOnNullValues =
           DataConverter.BehaviorOnNullValues.forValue(
@@ -114,12 +121,6 @@ public class ElasticsearchSinkTask extends SinkTask {
             ElasticsearchSinkConnectorConfig.MAX_RETRIES_CONFIG, maxRetry,
             ElasticsearchSinkConnectorConfig.RETRY_BACKOFF_MS_CONFIG, retryBackoffMs,
             TimeUnit.MILLISECONDS.toHours(maxRetryBackoffMs));
-      }
-
-      if (client != null) {
-        this.client = client;
-      } else {
-        this.client = new JestElasticsearchClient(props);
       }
 
       ElasticsearchWriter.Builder builder = new ElasticsearchWriter.Builder(this.client)
@@ -165,6 +166,17 @@ public class ElasticsearchSinkTask extends SinkTask {
           "Couldn't start ElasticsearchSinkTask due to configuration error:",
           e
       );
+    }
+  }
+
+  private void validatePipeline(String pipeline) {
+    if (!pipeline.isEmpty()) {
+      // Throw exception if pipeline does not exists in ElasticSearch.
+      if (!this.client.pipelineExists(pipeline)) {
+        throw new ConnectException(
+            String.format("Pipeline `%s` does not exists in ElasticSearch.", pipeline)
+        );
+      }
     }
   }
 

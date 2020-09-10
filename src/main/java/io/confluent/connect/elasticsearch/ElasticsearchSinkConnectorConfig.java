@@ -82,6 +82,9 @@ public class ElasticsearchSinkConnectorConfig extends AbstractConfig {
   private static final String MAX_RETRIES_DOC =
       "The maximum number of retries that are allowed for failed indexing requests. If the retry "
       + "attempts are exhausted the task will fail.";
+  public static final String PIPELINE_CONFIG = "pipeline";
+  private static final String PIPELINE_DOC =
+      "The pipeline used to pre-process documents before indexing.";
   public static final String RETRY_BACKOFF_MS_CONFIG = "retry.backoff.ms";
   private static final String RETRY_BACKOFF_MS_DOC =
       "How long to wait in milliseconds before attempting the first retry of a failed indexing "
@@ -597,6 +600,16 @@ public class ElasticsearchSinkConnectorConfig extends AbstractConfig {
         ++order,
         Width.SHORT,
         "Behavior on malformed documents"
+    ).define(
+        PIPELINE_CONFIG,
+        Type.STRING,
+        "",
+        Importance.MEDIUM,
+        PIPELINE_DOC,
+        group,
+        ++order,
+        Width.MEDIUM,
+        "Pipeline parameter for Bulk request"
     ).define(
         WRITE_METHOD_CONFIG,
         Type.STRING,

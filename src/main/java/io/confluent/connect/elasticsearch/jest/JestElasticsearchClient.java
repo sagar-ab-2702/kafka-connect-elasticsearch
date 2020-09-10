@@ -29,6 +29,7 @@ import io.confluent.connect.elasticsearch.bulk.BulkRequest;
 import io.confluent.connect.elasticsearch.bulk.BulkResponse;
 import io.confluent.connect.elasticsearch.jest.actions.PortableJestCreateIndexBuilder;
 import io.confluent.connect.elasticsearch.jest.actions.PortableJestGetMappingBuilder;
+import io.confluent.connect.elasticsearch.jest.actions.PortableJestGetPipeline;
 import io.confluent.connect.elasticsearch.jest.actions.PortableJestPutMappingBuilder;
 import io.searchbox.action.Action;
 import io.searchbox.action.BulkableAction;
@@ -62,7 +63,6 @@ import org.apache.http.nio.conn.ssl.SSLIOSessionStrategy;
 import org.apache.kafka.common.config.ConfigException;
 import org.apache.kafka.common.config.types.Password;
 import org.apache.kafka.common.network.Mode;
-import org.apache.kafka.common.security.ssl.DefaultSslEngineFactory;
 import org.apache.kafka.common.security.ssl.SslFactory;
 import org.apache.kafka.common.utils.SystemTime;
 import org.apache.kafka.common.utils.Time;
@@ -94,12 +94,14 @@ public class JestElasticsearchClient implements ElasticsearchClient {
       = "_all";
 
   private static final Logger LOG = LoggerFactory.getLogger(JestElasticsearchClient.class);
+  private static final String BULK_PIPELINE_PARAMETER = "pipeline";
 
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private final JestClient client;
   private final Version version;
   private long timeout;
+  private String pipeline;
   private WriteMethod writeMethod = WriteMethod.DEFAULT;
 
   private final Set<String> indexCache = new HashSet<>();
@@ -161,6 +163,7 @@ public class JestElasticsearchClient implements ElasticsearchClient {
               config.getLong(ElasticsearchSinkConnectorConfig.RETRY_BACKOFF_MS_CONFIG);
       this.maxRetries = config.getInt(ElasticsearchSinkConnectorConfig.MAX_RETRIES_CONFIG);
       this.timeout = config.getInt(ElasticsearchSinkConnectorConfig.READ_TIMEOUT_MS_CONFIG);
+      this.pipeline = config.getString(ElasticsearchSinkConnectorConfig.PIPELINE_CONFIG);
 
     } catch (IOException e) {
       throw new ConnectException(
@@ -437,6 +440,17 @@ public class JestElasticsearchClient implements ElasticsearchClient {
     }
   }
 
+  @Override
+  public boolean pipelineExists(String pipeline) {
+    Action<?> action = new PortableJestGetPipeline(pipeline);
+    try {
+      JestResult result = client.execute(action);
+      return result.isSucceeded();
+    } catch (IOException e) {
+      throw new ConnectException(e);
+    }
+  }
+
   public void createIndices(Set<String> indices) {
     log.trace("Attempting to discover or create indexes in Elasticsearch: {}", indices);
     for (String index : indices) {
@@ -568,6 +582,9 @@ public class JestElasticsearchClient implements ElasticsearchClient {
     final Bulk.Builder builder = new Bulk.Builder();
     for (IndexableRecord record : batch) {
       builder.addAction(toBulkableAction(record));
+    }
+    if (pipeline != null && !pipeline.isEmpty()) {
+      builder.setParameter(BULK_PIPELINE_PARAMETER, pipeline);
     }
     return new JestBulkRequest(builder.build());
   }

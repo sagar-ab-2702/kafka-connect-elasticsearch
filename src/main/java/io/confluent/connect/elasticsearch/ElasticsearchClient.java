@@ -64,6 +64,13 @@ public interface ElasticsearchClient extends AutoCloseable {
   JsonObject getMapping(String index, String type) throws IOException;
 
   /**
+   * Checks whether the specified pipeline exists under ElasticSearch or not.
+   *
+   * @param pipeline : ElasticSearch pipeline name.
+   */
+  boolean pipelineExists(String pipeline);
+
+  /**
    * Creates a bulk request for the list of {@link IndexableRecord} records.
    *
    * @param batch the list of records
